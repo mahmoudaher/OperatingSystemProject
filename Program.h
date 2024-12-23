@@ -8,4 +8,6 @@ void arkaplana_bekle();
 void Arkaplan_cikar(pid_t);
 int Arkaplan(char **);
 void linux_shell()
+void giris_yonlendirme();
+void cikis_yonlendirme();
 #endif
