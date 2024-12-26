@@ -1,16 +1,8 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <signal.h>
-// #include program.h
-
 #define MAX_INPUT 1024
 #define MAX_ARGS 64
 #define MAX_ARKAPLAN 64
+
+#include "Program.h"
 
 int bg_processes[MAX_ARKAPLAN];
 int bg_count = 0;
@@ -251,46 +243,224 @@ void tek_Komut_isleme(char **args, int background)
     }
 }
 
+void Virgul_boru(char *komutlar)
+{
+    char *command = strtok(komutlar, ";");
+
+    while (command != NULL)
+    {
+        pid_t pid = fork();
+        if (pid < 0)
+        {
+            perror("fork");
+            return;
+        }
+
+        if (pid == 0)
+        {
+            tek_Komut_isleme(command);
+        }
+
+        waitpid(pid, NULL, 0);
+        command = strtok(NULL, ";");
+    }
+}
+void boru_isleme(char *commands)
+{
+    char *cmd[MAX_ARGS];
+    int num_cmds = 0;
+
+    // Split the commands based on '|'
+    char *token = strtok(commands, "|");
+    while (token != NULL && num_cmds < MAX_ARGS - 1)
+    {
+        cmd[num_cmds++] = token;
+        token = strtok(NULL, "|");
+    }
+    cmd[num_cmds] = NULL;
+
+    int in_fd = 0;
+    int pipe_fd[2];
+
+    for (int i = 0; i < num_cmds; i++)
+    {
+        char *args[MAX_ARGS];
+        char *input_file = NULL;
+        char *output_file = NULL;
+
+        char *subtoken = strtok(cmd[i], " ");
+        int arg_index = 0;
+
+        while (subtoken != NULL)
+        {
+            if (strcmp(subtoken, "<") == 0) // buraya ekle giris_yonledirme
+            {
+                giris_yonlendirme(cmd[i]);
+                subtoken = strtok(NULL, " ");
+                if (subtoken != NULL)
+                {
+                    input_file = subtoken;
+                }
+            }
+            else if (strcmp(subtoken, ">") == 0)
+            {
+                cikis_yonlendirme(cmd[i]);
+                subtoken = strtok(NULL, " "); // buraya ekle Cikis_yonledirme
+                if (subtoken != NULL)
+                {
+                    output_file = subtoken;
+                }
+            }
+            else
+            {
+                args[arg_index++] = subtoken;
+            }
+            subtoken = strtok(NULL, " ");
+        }
+        args[arg_index] = NULL;
+
+        if (i < num_cmds - 1)
+        {
+            if (pipe(pipe_fd) == -1)
+            {
+                perror("pipe");
+                return;
+            }
+        }
+
+        pid_t pid = fork();
+        if (pid == 0)
+        {
+
+            if (input_file != NULL)
+            {
+                int fd = open(input_file, O_RDONLY);
+                if (fd < 0)
+                {
+                    perror("Input file");
+                    exit(EXIT_FAILURE);
+                }
+                dup2(fd, STDIN_FILENO);
+                close(fd);
+            }
+            else if (in_fd != 0)
+            {
+                dup2(in_fd, STDIN_FILENO);
+                close(in_fd);
+            }
+
+            if (output_file != NULL)
+            {
+                int fd = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                if (fd < 0)
+                {
+                    perror("Output file");
+                    exit(EXIT_FAILURE);
+                }
+                dup2(fd, STDOUT_FILENO);
+                close(fd);
+            }
+            else if (i < num_cmds - 1)
+            {
+                dup2(pipe_fd[1], STDOUT_FILENO);
+            }
+
+            if (i < num_cmds - 1)
+            {
+                close(pipe_fd[0]);
+                close(pipe_fd[1]);
+            }
+
+            execvp(args[0], args);
+            perror("execvp");
+            exit(EXIT_FAILURE);
+        }
+        else if (pid > 0)
+        {
+
+            waitpid(pid, NULL, 0);
+
+            if (i < num_cmds - 1)
+            {
+                close(pipe_fd[1]);
+            }
+
+            if (in_fd != 0)
+            {
+                close(in_fd);
+            }
+            in_fd = pipe_fd[0];
+        }
+        else
+        {
+            perror("fork");
+            return;
+        }
+    }
+}
+
 void linux_shell()
 {
-    char command[MAX_INPUT];
+    char komut[MAX_INPUT];
     char *args[MAX_ARGS];
 
     while (1)
     {
         printf("> ");
         fflush(stdout);
+        if (strlen(komut) == 0)
+        {
+            continue;
+        }
 
-        if (fgets(command, sizeof(command), stdin) == NULL)
+        if (fgets(komut, sizeof(komut), stdin) == NULL)
         {
             break;
         }
 
-        size_t len = strlen(command);
-        if (len > 0 && command[len - 1] == '\n')
+        size_t len = strlen(komut);
+        if (len > 0 && komut[len - 1] == '\n')
         {
-            command[len - 1] = '\0';
+            komut[len - 1] = '\0';
+        }
+        if (strstr(input, "|") != NULL)
+        {
+            char *sag = strtok(input, "|");
+            char *sol = strtok(NULL, "");
+
+            if (sol != NULL && sag != NULL)
+            {
+                boru_isleme(sol, sag);
+            }
+            else
+            {
+                fprintf(stderr, "Hata: pipe kullanımı yanlış.\n");
+            }
+        }
+        else if (strstr(input, ";") != NULL)
+        {
+            Virgul_boru(input);
         }
 
-        if (strstr(command, "<") != NULL)
+        if (strstr(komut, "<") != NULL)
         {
-            giris_yonlendirme(command);
+            giris_yonlendirme(komut);
             continue;
         }
 
-        if (strstr(command, ">") != NULL)
+        if (strstr(komut, ">") != NULL)
         {
-            cikis_yonlendirme(command);
+            cikis_yonlendirme(komut);
             continue;
         }
 
-        if (strcmp(command, "quit") == 0)
+        if (strcmp(komut, "quit") == 0)
         {
             arkaplana_bekle();
             break;
         }
 
-        giris(command, args);
+        giris(komut, args);
         arkaplan_kontrol();
         int background = Arkaplan(args);
         tek_Komut_isleme(args, background);
