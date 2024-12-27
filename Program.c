@@ -214,189 +214,243 @@ void cikis_yonlendirme(char *command)
 
 void tek_Komut_isleme(char **args, int background)
 {
-    pid_t pid = fork();
-    int status;
-
-    if (pid == 0)
+    if (args[0] == NULL)
     {
-        if (execvp(args[0], args) == -1)
-        {
-            perror("Komut çalıştırma hatası");
-            exit(EXIT_FAILURE);
-        }
+        return;
     }
-    else if (pid > 0)
+
+    if (strcmp(args[0], "cd") == 0)
     {
-        if (background)
+
+        if (args[1] == NULL)
         {
-            printf("[%d] Arka planda çalışıyor\n", pid);
-            Arkaplan_ekle(pid);
+            fprintf(stderr, "cd: eksik giris \n");
+        }
+        else if (chdir(args[1]) != 0)
+        {
+            perror("cd");
+        }
+        return;
+    }
+    else if (strcmp(args[0], "Arka") == 0)
+    {
+        for (int i = 0; i < bg_count; i++)
+        {
+            printf("[%d] %d\n", i + 1, bg_processes[i]);
+        }
+        return;
+    }
+    else if (strcmp(args[0], "Ana") == 0)
+    {
+
+        if (bg_count > 0)
+        {
+            pid_t pid = bg_processes[--bg_count];
+            int status;
+            waitpid(pid, &status, 0);
         }
         else
         {
-            waitpid(pid, &status, 0);
+            fprintf(stderr, "Ana: arkaplanda calisan komut yoktur\n");
+        }
+        return;
+    }
+    else if (strcmp(args[0], "mkdir") == 0)
+    {
+        if (args[1] == NULL)
+        {
+            fprintf(stderr, "mkdir: eksik dizin ismi\n");
+        }
+        else
+        {
+            if (mkdir(args[1], 0755) != 0)
+            {
+                perror("mkdir");
+            }
+        }
+        return;
+    }
+    // else if (strcmp(args[0], "ls") == 0)
+    // {
+    //     system("ls -p | grep -v /");
+    // }
+
+    pid_t pid = fork();
+    if (pid == 0)
+    {
+
+        if (execvp(args[0], args) == -1)
+        {
+            perror("execvp");
+        }
+        exit(EXIT_FAILURE);
+    }
+    else if (pid > 0)
+    {
+
+        if (background)
+        {
+            bg_processes[bg_count++] = pid;
+            printf("[%d] %d\n", bg_count, pid);
+        }
+        else
+        {
+            waitpid(pid, NULL, 0);
         }
     }
     else
     {
-        perror("Fork hatası");
+        perror("fork");
     }
+}
+void list_files()
+{
+    int pipe_fd[2];
+
+    if (pipe(pipe_fd) == -1)
+    {
+        perror("pipe");
+        exit(EXIT_FAILURE);
+    }
+
+    pid_t pid1 = fork();
+    if (pid1 == -1)
+    {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid1 == 0)
+    {
+
+        close(pipe_fd[0]);
+        dup2(pipe_fd[1], STDOUT_FILENO);
+        close(pipe_fd[1]);
+
+        execlp("ls", "ls", "-p", NULL);
+        perror("execlp (ls)");
+        exit(EXIT_FAILURE);
+    }
+
+    pid_t pid2 = fork();
+    if (pid2 == -1)
+    {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid2 == 0)
+    {
+
+        close(pipe_fd[1]);
+        dup2(pipe_fd[0], STDIN_FILENO);
+        close(pipe_fd[0]);
+
+        execlp("grep", "grep", "-v", "/", NULL);
+        perror("execlp (grep)");
+        exit(EXIT_FAILURE);
+    }
+
+    close(pipe_fd[0]);
+    close(pipe_fd[1]);
+
+    waitpid(pid1, NULL, 0);
+    waitpid(pid2, NULL, 0);
 }
 
 void Virgul_boru(char *komutlar)
 {
     char *command = strtok(komutlar, ";");
-
+    char *args[MAX_ARGS]; // Declare args
     while (command != NULL)
     {
+        giris(command, args); // Parse the command
         pid_t pid = fork();
         if (pid < 0)
         {
             perror("fork");
             return;
         }
-
         if (pid == 0)
         {
-            tek_Komut_isleme(command);
+            tek_Komut_isleme(args, Arkaplan(args)); // Pass args
         }
 
         waitpid(pid, NULL, 0);
         command = strtok(NULL, ";");
     }
 }
-void boru_isleme(char *commands)
+
+void boru_isleme(char *sol, char *sag)
 {
-    char *cmd[MAX_ARGS];
-    int num_cmds = 0;
-
-    // Split the commands based on '|'
-    char *token = strtok(commands, "|");
-    while (token != NULL && num_cmds < MAX_ARGS - 1)
-    {
-        cmd[num_cmds++] = token;
-        token = strtok(NULL, "|");
-    }
-    cmd[num_cmds] = NULL;
-
-    int in_fd = 0;
     int pipe_fd[2];
-
-    for (int i = 0; i < num_cmds; i++)
+    if (pipe(pipe_fd) == -1)
     {
+        perror("pipe");
+        exit(EXIT_FAILURE);
+    }
+
+    pid_t pid1 = fork();
+    if (pid1 == 0)
+    {
+        // Child process for the left command
+        close(pipe_fd[0]);               // Close unused read end
+        dup2(pipe_fd[1], STDOUT_FILENO); // Redirect stdout to pipe
+        close(pipe_fd[1]);
+
+        if (strstr(sol, "<") != NULL)
+        {
+            giris_yonlendirme(sol);
+            exit(EXIT_SUCCESS);
+        }
+
         char *args[MAX_ARGS];
-        char *input_file = NULL;
-        char *output_file = NULL;
-
-        char *subtoken = strtok(cmd[i], " ");
-        int arg_index = 0;
-
-        while (subtoken != NULL)
+        giris(sol, args);
+        if (execvp(args[0], args) == -1)
         {
-            if (strcmp(subtoken, "<") == 0) // buraya ekle giris_yonledirme
-            {
-                giris_yonlendirme(cmd[i]);
-                subtoken = strtok(NULL, " ");
-                if (subtoken != NULL)
-                {
-                    input_file = subtoken;
-                }
-            }
-            else if (strcmp(subtoken, ">") == 0)
-            {
-                cikis_yonlendirme(cmd[i]);
-                subtoken = strtok(NULL, " "); // buraya ekle Cikis_yonledirme
-                if (subtoken != NULL)
-                {
-                    output_file = subtoken;
-                }
-            }
-            else
-            {
-                args[arg_index++] = subtoken;
-            }
-            subtoken = strtok(NULL, " ");
-        }
-        args[arg_index] = NULL;
-
-        if (i < num_cmds - 1)
-        {
-            if (pipe(pipe_fd) == -1)
-            {
-                perror("pipe");
-                return;
-            }
-        }
-
-        pid_t pid = fork();
-        if (pid == 0)
-        {
-
-            if (input_file != NULL)
-            {
-                int fd = open(input_file, O_RDONLY);
-                if (fd < 0)
-                {
-                    perror("Input file");
-                    exit(EXIT_FAILURE);
-                }
-                dup2(fd, STDIN_FILENO);
-                close(fd);
-            }
-            else if (in_fd != 0)
-            {
-                dup2(in_fd, STDIN_FILENO);
-                close(in_fd);
-            }
-
-            if (output_file != NULL)
-            {
-                int fd = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-                if (fd < 0)
-                {
-                    perror("Output file");
-                    exit(EXIT_FAILURE);
-                }
-                dup2(fd, STDOUT_FILENO);
-                close(fd);
-            }
-            else if (i < num_cmds - 1)
-            {
-                dup2(pipe_fd[1], STDOUT_FILENO);
-            }
-
-            if (i < num_cmds - 1)
-            {
-                close(pipe_fd[0]);
-                close(pipe_fd[1]);
-            }
-
-            execvp(args[0], args);
-            perror("execvp");
+            perror("execvp (sol)");
             exit(EXIT_FAILURE);
         }
-        else if (pid > 0)
+    }
+    else if (pid1 < 0)
+    {
+        perror("fork (sol)");
+        exit(EXIT_FAILURE);
+    }
+
+    pid_t pid2 = fork();
+    if (pid2 == 0)
+    {
+        // Child process for the right command
+        close(pipe_fd[1]);              // Close unused write end
+        dup2(pipe_fd[0], STDIN_FILENO); // Redirect stdin to pipe
+        close(pipe_fd[0]);
+
+        if (strstr(sag, ">") != NULL)
         {
-
-            waitpid(pid, NULL, 0);
-
-            if (i < num_cmds - 1)
-            {
-                close(pipe_fd[1]);
-            }
-
-            if (in_fd != 0)
-            {
-                close(in_fd);
-            }
-            in_fd = pipe_fd[0];
+            cikis_yonlendirme(sag);
+            exit(EXIT_SUCCESS);
         }
-        else
+
+        char *args[MAX_ARGS];
+        giris(sag, args);
+        if (execvp(args[0], args) == -1)
         {
-            perror("fork");
-            return;
+            perror("execvp (sag)");
+            exit(EXIT_FAILURE);
         }
     }
+    else if (pid2 < 0)
+    {
+        perror("fork (sag)");
+        exit(EXIT_FAILURE);
+    }
+
+    // Parent process
+    close(pipe_fd[0]);
+    close(pipe_fd[1]);
+    waitpid(pid1, NULL, 0);
+    waitpid(pid2, NULL, 0);
 }
 
 void linux_shell()
@@ -408,10 +462,6 @@ void linux_shell()
     {
         printf("> ");
         fflush(stdout);
-        if (strlen(komut) == 0)
-        {
-            continue;
-        }
 
         if (fgets(komut, sizeof(komut), stdin) == NULL)
         {
@@ -423,11 +473,10 @@ void linux_shell()
         {
             komut[len - 1] = '\0';
         }
-        if (strstr(input, "|") != NULL)
+        if (strstr(komut, "|") != NULL)
         {
-            char *sag = strtok(input, "|");
-            char *sol = strtok(NULL, "");
-
+            char *sol = strtok(komut, "|");
+            char *sag = strtok(NULL, "");
             if (sol != NULL && sag != NULL)
             {
                 boru_isleme(sol, sag);
@@ -436,10 +485,14 @@ void linux_shell()
             {
                 fprintf(stderr, "Hata: pipe kullanımı yanlış.\n");
             }
+            continue;
         }
-        else if (strstr(input, ";") != NULL)
+        if (strstr(komut, ";") != NULL)
         {
-            Virgul_boru(input);
+
+            Virgul_boru(komut);
+
+            continue;
         }
 
         if (strstr(komut, "<") != NULL)
@@ -458,6 +511,10 @@ void linux_shell()
         {
             arkaplana_bekle();
             break;
+        }
+        if (strcmp(komut, "ls") == 0)
+        {
+            list_files();
         }
 
         giris(komut, args);
