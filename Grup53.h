@@ -18,7 +18,7 @@
 #include <sys/stat.h>
 
 void giris(char *, char **);
-void boru_isleme(char *, char *);
+void boru_isleme(char *[], int);
 void tek_Komut_isleme(char **, int);
 void Arkaplan_ekle(pid_t);
 void arkaplan_kontrol();
