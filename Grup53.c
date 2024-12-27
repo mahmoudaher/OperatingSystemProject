@@ -9,40 +9,37 @@
 #define MAX_ARGS 64     // Maksimum argüman sayısı
 #define MAX_ARKAPLAN 64 // Maksimum arka plan süreci sayısı
 
-
 #include "Grup53.h"
 
 // Arka planda çalışan süreçlerin PID'lerini saklayan dizi ve sayaç
 int bg_processes[MAX_ARKAPLAN];
 int bg_count = 0;
 
-
 // Komut satırından girilen girdiyi ayrıştırarak argümanlara böler
 void giris(char *input, char **args)
 {
-    char *token = strtok(input, " \t\n");  // Komut satırını tab, boşluk ve yeni satır karakterine göre ayır
+    char *token = strtok(input, " \t\n"); // Komut satırını tab, boşluk ve yeni satır karakterine göre ayır
     int i = 0;
     while (token != NULL && i < MAX_ARGS - 1)
     {
-        args[i++] = token;  // Her bir argüman diziye eklenir
+        args[i++] = token; // Her bir argüman diziye eklenir
         token = strtok(NULL, " \t\n");
     }
-    args[i] = NULL;  // Argüman listesinin sonunu belirtmek için NULL eklenir
+    args[i] = NULL; // Argüman listesinin sonunu belirtmek için NULL eklenir
 }
-
 
 // Komutun arka planda çalışıp çalışmayacağını kontrol eder
 int Arkaplan(char **args)
 {
     for (int i = 0; args[i] != NULL; i++)
     {
-        if (strcmp(args[i], "&") == 0)  // Komutun sonunda '&' varsa arka planda çalışacak
+        if (strcmp(args[i], "&") == 0) // Komutun sonunda '&' varsa arka planda çalışacak
         {
-            args[i] = NULL;  // '&' işareti komut listesinden kaldırılır
-            return 1;  // Arka plan komutu işaret edilir
+            args[i] = NULL; // '&' işareti komut listesinden kaldırılır
+            return 1;       // Arka plan komutu işaret edilir
         }
     }
-    return 0;  // Arka plan komutu yoksa 0 döner
+    return 0; // Arka plan komutu yoksa 0 döner
 }
 
 // Yeni bir arka plan süreci ekler
@@ -50,11 +47,11 @@ void Arkaplan_ekle(pid_t pid)
 {
     if (bg_count < MAX_ARKAPLAN)
     {
-        bg_processes[bg_count++] = pid;  // PID diziye eklenir
+        bg_processes[bg_count++] = pid; // PID diziye eklenir
     }
     else
     {
-        fprintf(stderr, "Arka plan islem kapasitesi doldu.\n");  // Maksimum arka plan süreci sayısı aşıldı
+        fprintf(stderr, "Arka plan islem kapasitesi doldu.\n"); // Maksimum arka plan süreci sayısı aşıldı
     }
 }
 
@@ -65,7 +62,7 @@ void Arkaplan_cikar(pid_t pid)
     {
         if (bg_processes[i] == pid)
         {
-            bg_processes[i] = bg_processes[--bg_count];  // PID bulunduğunda listeden çıkarılır ve liste sıkıştırılır
+            bg_processes[i] = bg_processes[--bg_count]; // PID bulunduğunda listeden çıkarılır ve liste sıkıştırılır
             return;
         }
     }
@@ -76,10 +73,10 @@ void arkaplan_kontrol()
 {
     int status;
     pid_t pid;
-    while ((pid = waitpid(-1, &status, WNOHANG)) > 0)  // Arka planda tamamlanmış süreçleri bekler
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) // Arka planda tamamlanmış süreçleri bekler
     {
         printf("[arka plan processi %d bitti]\n", pid);
-        Arkaplan_cikar(pid);  // Tamamlanan süreç listeden çıkarılır
+        Arkaplan_cikar(pid); // Tamamlanan süreç listeden çıkarılır
     }
 }
 
@@ -90,10 +87,10 @@ void arkaplana_bekle()
     for (int i = 0; i < bg_count; i++)
     {
         int status;
-        waitpid(bg_processes[i], &status, 0);  // Tüm arka plan süreçlerini bekler
+        waitpid(bg_processes[i], &status, 0); // Tüm arka plan süreçlerini bekler
         printf("[arka plan processi %d bitti]\n", bg_processes[i]);
     }
-    bg_count = 0;  // Tüm süreçler tamamlandıktan sonra sayaç sıfırlanır
+    bg_count = 0; // Tüm süreçler tamamlandıktan sonra sayaç sıfırlanır
 }
 
 // Giriş yönlendirmesi yapan fonksiyon
@@ -106,7 +103,7 @@ void giris_yonlendirme(char *command)
     char *token = strtok(command, " ");
     while (token != NULL)
     {
-        if (strcmp(token, "<") == 0)  // Giriş yönlendirme operatörü bulunduğunda
+        if (strcmp(token, "<") == 0) // Giriş yönlendirme operatörü bulunduğunda
         {
             token = strtok(NULL, " ");
             if (token == NULL)
@@ -114,7 +111,7 @@ void giris_yonlendirme(char *command)
                 fprintf(stderr, "Hata: Giris dosyasi belirtilmedi.\n");
                 return;
             }
-            input_file = token;  // Giriş dosyası belirlenir
+            input_file = token; // Giriş dosyası belirlenir
             break;
         }
         args[i++] = token;
@@ -136,13 +133,13 @@ void giris_yonlendirme(char *command)
     }
     if (pid == 0)
     {
-        int fd = open(input_file, O_RDONLY);  // Giriş dosyası açılır
+        int fd = open(input_file, O_RDONLY); // Giriş dosyası açılır
         if (fd < 0)
         {
             fprintf(stderr, "Giris dosyasi bulunamadi: %s\n", input_file);
             exit(EXIT_FAILURE);
         }
-        dup2(fd, STDIN_FILENO);  // Standart girdiyi dosyadan okur
+        dup2(fd, STDIN_FILENO); // Standart girdiyi dosyadan okur
         close(fd);
         if (execvp(args[0], args) == -1)
         {
@@ -152,7 +149,7 @@ void giris_yonlendirme(char *command)
     }
     else
     {
-        wait(NULL);  // Ana süreç çocuk süreci tamamlanana kadar bekler
+        wait(NULL); // Ana süreç çocuk süreci tamamlanana kadar bekler
     }
 }
 
@@ -166,7 +163,7 @@ void cikis_yonlendirme(char *command)
     char *token = strtok(command, " ");
     while (token != NULL)
     {
-        if (strcmp(token, ">") == 0)  // Çıkış yönlendirme operatörü bulunursa
+        if (strcmp(token, ">") == 0) // Çıkış yönlendirme operatörü bulunursa
         {
             token = strtok(NULL, " ");
             if (token == NULL)
@@ -174,12 +171,12 @@ void cikis_yonlendirme(char *command)
                 fprintf(stderr, "Hata: Cikisi dosyasi belirtilmedi.\n");
                 return;
             }
-            output_file = token;  // Çıkış dosyası belirlenir
+            output_file = token; // Çıkış dosyası belirlenir
             break;
         }
         else
         {
-            args[arg_index++] = token;  // Komut argümanları toplanır
+            args[arg_index++] = token; // Komut argümanları toplanır
         }
         token = strtok(NULL, " ");
     }
@@ -187,7 +184,7 @@ void cikis_yonlendirme(char *command)
 
     if (args[0] == NULL)
     {
-        fprintf(stderr, "Hata: Komut belirtilmedi.\n");  // Komut girilmemişse hata verir
+        fprintf(stderr, "Hata: Komut belirtilmedi.\n"); // Komut girilmemişse hata verir
         return;
     }
 
@@ -198,16 +195,16 @@ void cikis_yonlendirme(char *command)
     }
 
     pid_t pid = fork();
-    if (pid == 0)  // Çocuk süreç oluşturulur
+    if (pid == 0) // Çocuk süreç oluşturulur
     {
-        int fd = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);  // Çıkış dosyası oluşturulur veya sıfırlanır
+        int fd = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644); // Çıkış dosyası oluşturulur veya sıfırlanır
         if (fd < 0)
         {
             perror("Cikis dosyasi acilamadi.");
             exit(EXIT_FAILURE);
         }
 
-        if (dup2(fd, STDOUT_FILENO) < 0)  // Çıkış standard out'a yönlendirilir
+        if (dup2(fd, STDOUT_FILENO) < 0) // Çıkış standard out'a yönlendirilir
         {
             perror("Dosya tanimlayicisi kopyalanamadi");
             close(fd);
@@ -223,17 +220,17 @@ void cikis_yonlendirme(char *command)
     }
     else if (pid > 0)
     {
-        wait(NULL);  // Ana süreç çocuk süreci bekler
+        wait(NULL); // Ana süreç çocuk süreci bekler
     }
     else
     {
-        perror("Fork islemi basarisiz");  // Fork hatası durumunda hata mesajı verir
+        perror("Fork islemi basarisiz"); // Fork hatası durumunda hata mesajı verir
     }
 }
 // Komut işleme fonksiyonu
 void tek_Komut_isleme(char **args, int background)
 {
-    if (args[0] == NULL)  // Argüman yoksa fonksiyon sona erer
+    if (args[0] == NULL) // Argüman yoksa fonksiyon sona erer
     {
         return;
     }
@@ -241,11 +238,11 @@ void tek_Komut_isleme(char **args, int background)
     // 'cd' komutu için dızın değiştirme
     if (strcmp(args[0], "cd") == 0)
     {
-        if (args[1] == NULL)  // Dizin adı eksikse hata verir
+        if (args[1] == NULL) // Dizin adı eksikse hata verir
         {
             fprintf(stderr, "cd: eksik giris \n");
         }
-        else if (chdir(args[1]) != 0)  // Dizin değiştirme hatası durumunda hata verir
+        else if (chdir(args[1]) != 0) // Dizin değiştirme hatası durumunda hata verir
         {
             perror("cd");
         }
@@ -292,12 +289,12 @@ void tek_Komut_isleme(char **args, int background)
         return;
     }
 
-    pid_t pid = fork();  // Yeni bir süreç oluştur
+    pid_t pid = fork(); // Yeni bir süreç oluştur
     if (pid == 0)
     {
         if (execvp(args[0], args) == -1)
         {
-            perror("execvp");  // Komut hatalıysa hata mesajı yazdır
+            perror("execvp"); // Komut hatalıysa hata mesajı yazdır
         }
         exit(EXIT_FAILURE);
     }
@@ -315,7 +312,7 @@ void tek_Komut_isleme(char **args, int background)
     }
     else
     {
-        perror("fork");  // Fork hatası varsa hata mesajı verir
+        perror("fork"); // Fork hatası varsa hata mesajı verir
     }
 }
 
@@ -324,150 +321,161 @@ void list_files()
 {
     int pipe_fd[2];
 
-    if (pipe(pipe_fd) == -1)  // Pipe oluşturulur
+    if (pipe(pipe_fd) == -1) // Pipe oluşturulur
     {
         perror("pipe");
         exit(EXIT_FAILURE);
     }
 
-    pid_t pid1 = fork();  // Birinci çocuk süreci oluşturulur
+    pid_t pid1 = fork(); // Birinci çocuk süreci oluşturulur
     if (pid1 == -1)
     {
         perror("fork");
         exit(EXIT_FAILURE);
     }
 
-    if (pid1 == 0)  // Birinci çocuk süreci ('ls' komutunu çalıştır)
+    if (pid1 == 0) // Birinci çocuk süreci ('ls' komutunu çalıştır)
     {
-        close(pipe_fd[0]);  // Okuma ucunu kapat
-        dup2(pipe_fd[1], STDOUT_FILENO);  // Pipe yazma ucunu stdout'a yönlendir
-        close(pipe_fd[1]);  // Pipe'in yazma ucunu kapat
+        close(pipe_fd[0]);               // Okuma ucunu kapat
+        dup2(pipe_fd[1], STDOUT_FILENO); // Pipe yazma ucunu stdout'a yönlendir
+        close(pipe_fd[1]);               // Pipe'in yazma ucunu kapat
 
-        execlp("ls", "ls", "-p", NULL);  // 'ls -p' komutunu çalıştır
-        perror("execlp (ls)");  // Hata olursa mesaj bas
+        execlp("ls", "ls", "-p", NULL); // 'ls -p' komutunu çalıştır
+        perror("execlp (ls)");          // Hata olursa mesaj bas
         exit(EXIT_FAILURE);
     }
 
-    pid_t pid2 = fork();  // İkinci çocuk süreci oluşturulur
+    pid_t pid2 = fork(); // İkinci çocuk süreci oluşturulur
     if (pid2 == -1)
     {
         perror("fork");
         exit(EXIT_FAILURE);
     }
 
-    if (pid2 == 0)  // İkinci çocuk süreci ('grep' komutunu çalıştır)
+    if (pid2 == 0) // İkinci çocuk süreci ('grep' komutunu çalıştır)
     {
-        close(pipe_fd[1]);  // Yazma ucunu kapat
-        dup2(pipe_fd[0], STDIN_FILENO);  // Pipe okuma ucunu stdin'e yönlendir
-        close(pipe_fd[0]);  // Pipe'in okuma ucunu kapat
+        close(pipe_fd[1]);              // Yazma ucunu kapat
+        dup2(pipe_fd[0], STDIN_FILENO); // Pipe okuma ucunu stdin'e yönlendir
+        close(pipe_fd[0]);              // Pipe'in okuma ucunu kapat
 
-        execlp("grep", "grep", "-v", "/", NULL);  // 'grep -v /' komutunu çalıştır
+        execlp("grep", "grep", "-v", "/", NULL); // 'grep -v /' komutunu çalıştır
         perror("execlp (grep)");
         exit(EXIT_FAILURE);
     }
 
-    close(pipe_fd[0]);  // Pipe'in okuma ucunu kapat
-    close(pipe_fd[1]);  // Pipe'in yazma ucunu kapat
+    close(pipe_fd[0]); // Pipe'in okuma ucunu kapat
+    close(pipe_fd[1]); // Pipe'in yazma ucunu kapat
 
-    waitpid(pid1, NULL, 0);  // Birinci çocuk sürecini bekle
-    waitpid(pid2, NULL, 0);  // İkinci çocuk sürecini bekle
+    waitpid(pid1, NULL, 0); // Birinci çocuk sürecini bekle
+    waitpid(pid2, NULL, 0); // İkinci çocuk sürecini bekle
 }
 
 void Virgul_boru(char *komutlar)
 {
-    char *command = strtok(komutlar, ";");  // Komutları ';' ile ayır
+    char *command = strtok(komutlar, ";"); // Komutları ';' ile ayır
     char *args[MAX_ARGS];
-    
+
     while (command != NULL)
     {
-        pid_t pid = fork();  // Her komut için ayrı süreç oluştur
-        
+        pid_t pid = fork(); // Her komut için ayrı süreç oluştur
+
         if (pid < 0)
         {
             perror("fork");
             return;
         }
-        
-        if (pid == 0)  // Çocuk süreçte çalıştır
+
+        if (pid == 0) // Çocuk süreçte çalıştır
         {
-            giris(command, args);  // Komutu ayrıştır
-            tek_Komut_isleme(args, Arkaplan(args));  // Komutu çalıştır
-            exit(EXIT_SUCCESS);  // Çocuk süreç tamamlandığında çık
+            giris(command, args);                   // Komutu ayrıştır
+            tek_Komut_isleme(args, Arkaplan(args)); // Komutu çalıştır
+            exit(EXIT_SUCCESS);                     // Çocuk süreç tamamlandığında çık
         }
         else
         {
-            waitpid(pid, NULL, 0);  // Her komutun bitmesini bekle
+            waitpid(pid, NULL, 0); // Her komutun bitmesini bekle
         }
-        
+
         // Bir sonraki komuta geç
         command = strtok(NULL, ";");
     }
 }
 
-void boru_isleme(char *komutlar[], int komut_sayisi) {
+void boru_isleme(char *komutlar[], int komut_sayisi)
+{
     int pipe_fd[komut_sayisi - 1][2];
 
     // Gerekli pipe'ları oluştur
-    for (int i = 0; i < komut_sayisi - 1; i++) {
-        if (pipe(pipe_fd[i]) == -1) {
+    for (int i = 0; i < komut_sayisi - 1; i++)
+    {
+        if (pipe(pipe_fd[i]) == -1)
+        {
             perror("pipe");
             exit(EXIT_FAILURE);
         }
     }
 
     // Her komut için fork ve execvp
-    for (int i = 0; i < komut_sayisi; i++) {
+    for (int i = 0; i < komut_sayisi; i++)
+    {
         pid_t pid = fork();
-        if (pid == 0) {  // Çocuk süreç
-            if (i > 0) {
-                dup2(pipe_fd[i - 1][0], STDIN_FILENO);  // Önceki pipe'dan oku
+        if (pid == 0)
+        { // Çocuk süreç
+            if (i > 0)
+            {
+                dup2(pipe_fd[i - 1][0], STDIN_FILENO); // Önceki pipe'dan oku
             }
-            if (i < komut_sayisi - 1) {
-                dup2(pipe_fd[i][1], STDOUT_FILENO);  // Sonraki pipe'a yaz
+            if (i < komut_sayisi - 1)
+            {
+                dup2(pipe_fd[i][1], STDOUT_FILENO); // Sonraki pipe'a yaz
             }
 
             // Pipe uçlarını kapat
-            for (int j = 0; j < komut_sayisi - 1; j++) {
+            for (int j = 0; j < komut_sayisi - 1; j++)
+            {
                 close(pipe_fd[j][0]);
                 close(pipe_fd[j][1]);
             }
 
             char *args[MAX_ARGS];
-            giris(komutlar[i], args);  // Komutu ayrıştır
+            giris(komutlar[i], args); // Komutu ayrıştır
             execvp(args[0], args);
             perror("execvp");
             exit(EXIT_FAILURE);
-        } else if (pid < 0) {
+        }
+        else if (pid < 0)
+        {
             perror("fork");
             exit(EXIT_FAILURE);
         }
     }
 
     // Ebeveyn süreç pipe uçlarını kapatır
-    for (int i = 0; i < komut_sayisi - 1; i++) {
+    for (int i = 0; i < komut_sayisi - 1; i++)
+    {
         close(pipe_fd[i][0]);
         close(pipe_fd[i][1]);
     }
 
     // Tüm çocuk süreçlerin tamamlanmasını bekle
-    for (int i = 0; i < komut_sayisi; i++) {
+    for (int i = 0; i < komut_sayisi; i++)
+    {
         wait(NULL);
     }
 }
 
-
 // Basit bir komut satırı kabuğu uygular
 void linux_shell()
 {
-    char komut[MAX_INPUT];  // Kullanıcıdan gelen komutları saklar
+    char komut[MAX_INPUT]; // Kullanıcıdan gelen komutları saklar
     char *args[MAX_ARGS];
 
     while (1)
     {
-        printf("> ");  // Komut satırı işareti
+        printf("> "); // Komut satırı işareti
         fflush(stdout);
 
-        if (fgets(komut, sizeof(komut), stdin) == NULL)  // Komut al, hata durumunda döngüden çık
+        if (fgets(komut, sizeof(komut), stdin) == NULL) // Komut al, hata durumunda döngüden çık
         {
             break;
         }
@@ -475,29 +483,34 @@ void linux_shell()
         size_t len = strlen(komut);
         if (len > 0 && komut[len - 1] == '\n')
         {
-            komut[len - 1] = '\0';  // Yeni satır karakterini kaldır
+            komut[len - 1] = '\0'; // Yeni satır karakterini kaldır
         }
 
         // Pipe komutlarını işler
-        if (strstr(komut, "|") != NULL) {
-        char *komutlar[MAX_ARGS];
-        int komut_sayisi = 0;
+        if (strstr(komut, "|") != NULL)
+        {
+            char *komutlar[MAX_ARGS];
+            int komut_sayisi = 0;
 
-        // '|' ile ayır ve komutları diziye ekle
-        char *token = strtok(komut, "|");
-        while (token != NULL && komut_sayisi < MAX_ARGS - 1) {
-            komutlar[komut_sayisi++] = token;
-            token = strtok(NULL, "|");
-        }
-        komutlar[komut_sayisi] = NULL;
+            // '|' ile ayır ve komutları diziye ekle
+            char *token = strtok(komut, "|");
+            while (token != NULL && komut_sayisi < MAX_ARGS - 1)
+            {
+                komutlar[komut_sayisi++] = token;
+                token = strtok(NULL, "|");
+            }
+            komutlar[komut_sayisi] = NULL;
 
-        // Birden fazla pipe işlemi yap
-        if (komut_sayisi > 1) {
-            boru_isleme(komutlar, komut_sayisi);
-        } else {
-            fprintf(stderr, "Hata: Pipe kullanimi hatali.\n");
-        }
-        continue;
+            // Birden fazla pipe işlemi yap
+            if (komut_sayisi > 1)
+            {
+                boru_isleme(komutlar, komut_sayisi);
+            }
+            else
+            {
+                fprintf(stderr, "Hata: Pipe kullanimi hatali.\n");
+            }
+            continue;
         }
 
         // Noktalı virgül komutlarını sırayla işler
@@ -524,7 +537,7 @@ void linux_shell()
         // Kabuktan çıkış komutu
         if (strcmp(komut, "quit") == 0)
         {
-            arkaplana_bekle();  // Arka plan süreçlerini bekle
+            arkaplana_bekle(); // Arka plan süreçlerini bekle
             break;
         }
 
@@ -534,16 +547,16 @@ void linux_shell()
             list_files();
         }
 
-        giris(komut, args);  // Komutu ayrıştır
-        arkaplan_kontrol();  // Arka plan süreçlerini kontrol et
+        giris(komut, args); // Komutu ayrıştır
+        arkaplan_kontrol(); // Arka plan süreçlerini kontrol et
         int background = Arkaplan(args);
-        tek_Komut_isleme(args, background);  // Komutu çalıştır
+        tek_Komut_isleme(args, background); // Komutu çalıştır
     }
 }
 
 int main()
 {
-    linux_shell(); 
+    linux_shell();
     printf("Kabuktan cikildi.\n");
     return 0;
 }
