@@ -1,5 +1,12 @@
-#ifndef PROGRAM_H
-#define PROGRAM_H
+/*
+    Ahmed bahaa Ahmed momtaz 2-B G221210569
+    Mahmoud Aldaher 2-C G221210588
+    Göktuğ Yüceer 1-A B221210058
+    Khalid almuanen 2-B G211210575
+*/
+
+#ifndef GRUP53_H
+#define GRUP53_H
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
